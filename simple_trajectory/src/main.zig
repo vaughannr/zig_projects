@@ -1,46 +1,25 @@
-//! By convention, main.zig is where your main function lives in the case that
-//! you are building an executable. If you are making a library, the convention
-//! is to delete this file and start with root.zig instead.
+const std = @import("std");
+const phys = @import("simple_trajectory_lib");
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    const stdout = std.io.getStdOut().writer();
+    const allocator = std.heap.page_allocator;
+    const args = try std.process.argsAlloc(allocator);
+    if (args.len != 3) {
+        try stdout.print("Usage: {s} <initial_velocity (m/s)> <launch_angle (degrees)>\n", .{args[0]});
+        return error.InvalidArguments;
+    }
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+    // Convert the input arguments into a floating-point value.
+    const initial_velocity = try std.fmt.parseFloat(f64, args[1]);
+    const launch_angle_degrees = try std.fmt.parseFloat(f64, args[2]);
+    const launch_angle_radians = std.math.pi * launch_angle_degrees / 180.0;
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    // Run the projectile motion simulation.
+    const results = phys.simulateProjectile(initial_velocity, launch_angle_radians);
 
-    try bw.flush(); // Don't forget to flush!
+    try stdout.print("Simulation Results:\n", .{});
+    try stdout.print("Time of Flight: {d:.3} seconds\n", .{results.time_of_flight});
+    try stdout.print("Maximum Altitude: {d:.3} meters\n", .{results.max_altitude});
+    try stdout.print("Horizontal Range: {d:.3} meters\n", .{results.range});
 }
-
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // Try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
-}
-
-test "use other module" {
-    try std.testing.expectEqual(@as(i32, 150), lib.add(100, 50));
-}
-
-test "fuzz example" {
-    const Context = struct {
-        fn testOne(context: @This(), input: []const u8) anyerror!void {
-            _ = context;
-            // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-            try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
-        }
-    };
-    try std.testing.fuzz(Context{}, Context.testOne, .{});
-}
-
-const std = @import("std");
-
-/// This imports the separate module containing `root.zig`. Take a look in `build.zig` for details.
-const lib = @import("simple_trajectory_lib");
